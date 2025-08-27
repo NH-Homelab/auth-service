@@ -9,8 +9,8 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/NH-Homelab/auth-service/internal/models"
 	"github.com/NH-Homelab/auth-service/internal/pg_db"
+	"github.com/NH-Homelab/auth-service/internal/userdao"
 )
 
 func logRequest(next http.Handler) http.Handler {
@@ -48,19 +48,13 @@ func main() {
 	defer pgDB.Close()
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		res, err := pgDB.Query("SELECT * FROM users;")
+		users, err := userdao.GetUsers(pgDB)
 		if err != nil {
 			http.Error(w, "Failed to query database", http.StatusInternalServerError)
 			return
 		}
-		defer res.Close()
 
-		for res.Next() {
-			var user models.User
-			if err := res.Scan(&user.ID, &user.Name, &user.CreatedAt); err != nil {
-				http.Error(w, "Failed to scan user", http.StatusInternalServerError)
-				return
-			}
+		for _, user := range users {
 			fmt.Fprintf(w, "User: %s, Created At: %s\n", user.Name, user.CreatedAt)
 		}
 	})
