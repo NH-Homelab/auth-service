@@ -5,9 +5,8 @@ The auth service is designed to handle `auth_request` directives from the nginx 
 - [ ] Create HTTP Server
     - [x] Basic Hello World listener
     - [ ] Setup routes 
-        - [ ] `auth_request` route
-        - [ ] Google OAuth callback? Need a refresh on how this works
-        - [ ] Login Route
+        - [ ] `/auth/google/callback`
+        - [ ] `/auth/login`
     - [ ] Create middlewares
         - [x] Request logger
         - [ ] Check cookie data
@@ -23,9 +22,9 @@ The auth service is designed to handle `auth_request` directives from the nginx 
         - [ ] Login Handler
             - [ ] If user exists, creates a cookie for them and redirect to the original route requested
             - [ ] If user doesn't exist, log user in DB awaiting approval from Admin
-- [ ] Create db_handler package
-    - [ ] Initialize database connection
-    - [ ] Get user data from tables
+- [ ] Create pg_db package
+    - [x] Initialize database connection
+    - [x] Get user data from tables
     - [ ] Create new users
     - [ ] Get route authentication rules
 
