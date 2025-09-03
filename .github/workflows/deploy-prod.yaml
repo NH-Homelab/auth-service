@@ -20,8 +20,6 @@ jobs:
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       JWT_DOMAIN: ${{ secrets.JWT_DOMAIN }}
       USE_TLS: ${{ secrets.USE_TLS }}
-      TLS_CERT_FILE: ${{ secrets.TLS_CERT_FILE }}
-      TLS_KEY_FILE: ${{ secrets.TLS_KEY_FILE }}
 
     steps:
       - name: Checkout code
@@ -45,8 +43,6 @@ jobs:
           echo "JWT_SECRET=${JWT_SECRET}" >> .env
           echo "JWT_DOMAIN=${JWT_DOMAIN}" >> .env
           echo "USE_TLS=${USE_TLS}" >> .env
-          echo "TLS_CERT_FILE=${TLS_CERT_FILE}" >> .env
-          echo "TLS_KEY_FILE=${TLS_KEY_FILE}" >> .env
 
       - name: Create Kubernetes Secret from .env
         run: |
