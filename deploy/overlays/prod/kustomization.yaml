@@ -3,4 +3,4 @@ resources:
   - secret.yaml
 
 patches:
-  - deployment-patch.yaml
+  - path: deployment-patch.yaml
