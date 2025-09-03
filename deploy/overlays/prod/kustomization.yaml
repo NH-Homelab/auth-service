@@ -2,5 +2,5 @@ resources:
   - ../../base
   - secret.yaml
 
-patchesStrategicMerge:
+patches:
   - deployment-patch.yaml
