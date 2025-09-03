@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -9,13 +8,21 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/NH-Homelab/auth-service/internal/GoogleOauthHandler"
+	authhandler "github.com/NH-Homelab/auth-service/internal/authHandler"
 	"github.com/NH-Homelab/auth-service/internal/pg_db"
-	"github.com/NH-Homelab/auth-service/internal/userdao"
 )
 
 func logRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received request: %s %s from %s\n", r.Method, r.URL, r.RemoteAddr)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func setContentType(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -47,17 +54,32 @@ func main() {
 	}
 	defer pgDB.Close()
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		users, err := userdao.GetUsers(pgDB)
+	// TODO: create separate mux for this if I want to apply middlewares
+	gah := GoogleOauthHandler.NewGoogleOauthHandler(pgDB)
+	gah.RegisterHandlers(mux)
+
+	ah := authhandler.NewAuthHandler(pgDB)
+	ah.RegisterHandlers(mux)
+
+	useTLS := os.Getenv("USE_TLS") == "true"
+	if useTLS {
+		certFile := os.Getenv("TLS_CERT_FILE")
+		keyFile := os.Getenv("TLS_KEY_FILE")
+		if certFile == "" || keyFile == "" {
+			log.Fatal("TLS enabled but TLS_CERT_FILE or TLS_KEY_FILE not set")
+		}
+		log.Printf("Starting HTTPS server on :8443...")
+		err := http.ListenAndServeTLS(":8443", certFile, keyFile, logRequest(setContentType(mux)))
 		if err != nil {
-			http.Error(w, "Failed to query database", http.StatusInternalServerError)
-			return
+			log.Fatalf("HTTPS server failed: %v", err)
 		}
-
-		for _, user := range users {
-			fmt.Fprintf(w, "User: %s, Created At: %s\n", user.Name, user.CreatedAt)
+	} else {
+		// For production behind nginx, use plain HTTP:
+		// http.ListenAndServe(":8080", logRequest(mux))
+		log.Printf("Starting HTTP server on :8080...")
+		err := http.ListenAndServe(":8080", logRequest(setContentType(mux)))
+		if err != nil {
+			log.Fatalf("HTTP server failed: %v", err)
 		}
-	})
-
-	http.ListenAndServe(":8080", logRequest(mux))
+	}
 }

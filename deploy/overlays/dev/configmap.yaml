@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-env
+binaryData:
+  .env: |-
+    # This will be replaced by Kustomize from the actual .env file
