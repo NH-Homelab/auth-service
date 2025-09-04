@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:latest-alpine AS builder
 WORKDIR /app
 COPY . .
 RUN go build -o auth-service main.go
