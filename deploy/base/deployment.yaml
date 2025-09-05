@@ -14,6 +14,8 @@ spec:
     spec:
       containers:
       - name: auth-service
-        image: auth-service:latest
+        image: ghcr.io/nh-homelab/auth-service:latest
         ports:
         - containerPort: 8080
+      imagePullSecrets:
+      - name: ghcr-creds
