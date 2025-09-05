@@ -1,19 +1,12 @@
 bases:
   - ../../base
 
-# Example patch for dev environment
-
-resources:
-  - ../../base
-  - configmap.yaml
-  - deployment-patch.yaml
+patches:
+  - path: deployment-patch.yaml
 
 generatorOptions:
   disableNameSuffixHash: true
 configMapGenerator:
   - name: auth-env
     files:
-      - ../../.env
-
-patches:
-  # You can add patches here, e.g., to change replica count or image
+      - .env
