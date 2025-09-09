@@ -1,14 +1,11 @@
 name: Build, Push, and Deploy
-
 on:
   push:
     branches:
       - main
-
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   build-and-push-image:
     runs-on: self-hosted
@@ -20,14 +17,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Log in to Docker Hub
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -37,7 +32,6 @@ jobs:
             type=ref,event=branch
             type=sha
             type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Build and push Docker image
         id: push
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
@@ -47,14 +41,12 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
-
   deploy:
     runs-on: self-hosted
     needs: build-and-push-image
@@ -72,16 +64,13 @@ jobs:
       USE_TLS: ${{ secrets.USE_TLS }}
       TLS_CERT_FILE: ${{ secrets.TLS_CERT_FILE }}
       TLS_KEY_FILE: ${{ secrets.TLS_KEY_FILE }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
           version: 'latest'
-
       - name: Create .env file from secrets
         run: |
           echo "DB_HOST=${DB_HOST}" >> .env
@@ -97,15 +86,18 @@ jobs:
           echo "USE_TLS=${USE_TLS}" >> .env
           echo "TLS_CERT_FILE=${TLS_CERT_FILE}" >> .env
           echo "TLS_KEY_FILE=${TLS_KEY_FILE}" >> .env
-
       - name: Create Kubernetes Secret from .env
         run: |
           kubectl create secret generic auth-secret \
             --from-file=.env=.env \
             --dry-run=client -o yaml > deploy/overlays/prod/secret.yaml
-
-      - name: Deploy using Kustomize
+      - name: Run Kustomize
         run: |
           kubectl apply -k deploy/overlays/prod/
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG }}
+      - name: Restart auth-service deployment
+        run: |
+          kubectl rollout restart deployment auth-service
         env:
           KUBECONFIG: ${{ secrets.KUBECONFIG }}
