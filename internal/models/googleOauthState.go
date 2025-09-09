@@ -8,4 +8,5 @@ type GoogleOauthState struct {
 	Path   string `json:"path"`
 	Uri    string `json:"uri"`
 	Method string `json:"method"`
+	Scheme string `json:"scheme"`
 }
