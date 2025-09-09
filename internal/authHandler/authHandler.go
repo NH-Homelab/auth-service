@@ -54,12 +54,11 @@ func (ah *AuthHandler) RegisterHandlers(mux *http.ServeMux) {
 		if err != nil {
 			fmt.Printf("No cookie found: %v\n", err)
 			resp := authResponse{
-				Status:  "redirect",
-				Message: "No cookie found, redirecting to login",
+				Status:  "error",
+				Message: "Cookie not found",
 			}
 			w.WriteHeader(http.StatusUnauthorized)
 			_ = json.NewEncoder(w).Encode(resp)
-			http.Redirect(w, r, "/google/login", http.StatusFound)
 			return
 		}
 
