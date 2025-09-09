@@ -14,7 +14,10 @@ spec:
                 path: .env
       containers:
         - name: auth-service
+          image: auth-service:latest
+          imagePullPolicy: Never
           volumeMounts:
             - name: env-file
               mountPath: /app/.env
               subPath: .env
+      imagePullSecrets: []   # <-- removes the secret

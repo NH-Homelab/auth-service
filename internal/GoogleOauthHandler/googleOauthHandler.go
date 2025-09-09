@@ -2,6 +2,8 @@ package GoogleOauthHandler
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -36,6 +38,39 @@ func NewGoogleOauthHandler(db database.DatabaseConnection) *GoogleOauthHandler {
 		conf: oauthConfig,
 		db:   db,
 	}
+}
+
+// generateCSRFToken generates a cryptographically secure random CSRF token
+func generateCSRFToken() (string, error) {
+	b := make([]byte, 32) // 32 bytes = 256 bits
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
+}
+
+// verifyOAuthState verifies and decodes the signed OAuth state
+func verifyOAuthState(signedState string) (models.GoogleOauthState, error) {
+	var state models.GoogleOauthState
+
+	// Verify the signed state
+	claims, err := jwt.VerifyToken(signedState)
+	if err != nil {
+		return state, fmt.Errorf("failed to verify state token: %w", err)
+	}
+
+	// Convert claims back to state struct
+	claimsBytes, err := json.Marshal(claims)
+	if err != nil {
+		return state, fmt.Errorf("failed to marshal claims: %w", err)
+	}
+
+	if err := json.Unmarshal(claimsBytes, &state); err != nil {
+		return state, fmt.Errorf("failed to unmarshal state: %w", err)
+	}
+
+	return state, nil
 }
 
 func (ah GoogleOauthHandler) handleCallback(code string) (models.User, error) {
@@ -104,7 +139,44 @@ func (ah GoogleOauthHandler) RegisterHandlers(mux *http.ServeMux) {
 			Token   string `json:"token,omitempty"`
 		}
 		if err != nil {
-			url := ah.conf.AuthCodeURL("random-state-string", oauth2.AccessTypeOffline)
+			// Generate a secure CSRF token
+			csrfToken, err := generateCSRFToken()
+			if err != nil {
+				http.Error(w, "Failed to generate CSRF token", http.StatusInternalServerError)
+				return
+			}
+
+			// Create State object with CSRF token and request info
+			state := models.GoogleOauthState{
+				CsrfToken: csrfToken,
+				Host:      r.Host,
+				Path:      r.URL.Path,
+				Uri:       r.RequestURI,
+				Method:    r.Method,
+			}
+
+			// Convert state to map for JWT signing
+			stateBytes, err := json.Marshal(state)
+			if err != nil {
+				http.Error(w, "Failed to marshal state", http.StatusInternalServerError)
+				return
+			}
+
+			var stateMap map[string]interface{}
+			if err := json.Unmarshal(stateBytes, &stateMap); err != nil {
+				http.Error(w, "Failed to convert state to map", http.StatusInternalServerError)
+				return
+			}
+
+			// Sign the state using JWT
+			signedState, err := jwt.SignKey(stateMap)
+			if err != nil {
+				http.Error(w, "Failed to sign state", http.StatusInternalServerError)
+				return
+			}
+
+			// Redirect to Google OAuth with the signed state
+			url := ah.conf.AuthCodeURL(signedState, oauth2.AccessTypeOffline)
 			http.Redirect(w, r, url, http.StatusFound)
 			return
 		}
@@ -142,14 +214,40 @@ func (ah GoogleOauthHandler) RegisterHandlers(mux *http.ServeMux) {
 	})
 
 	mux.HandleFunc("/google/callback", func(w http.ResponseWriter, r *http.Request) {
-		code := r.URL.Query().Get("code")
-		user, err := ah.handleCallback(code)
 		type callbackResponse struct {
 			Status  string       `json:"status"`
 			Message string       `json:"message,omitempty"`
 			User    *models.User `json:"user,omitempty"`
 			Token   string       `json:"token,omitempty"`
 		}
+
+		// Verify the OAuth state parameter
+		stateParam := r.URL.Query().Get("state")
+		if stateParam == "" {
+			resp := callbackResponse{
+				Status:  "error",
+				Message: "Missing state parameter",
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+
+		original_request, err := verifyOAuthState(stateParam)
+		if err != nil {
+			fmt.Printf("State verification failed: %v\n", err)
+			resp := callbackResponse{
+				Status:  "error",
+				Message: "Invalid state parameter",
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+
+		code := r.URL.Query().Get("code")
+		user, err := ah.handleCallback(code)
+
 		if err != nil {
 			fmt.Printf("Error handling callback: %v\n", err)
 			resp := callbackResponse{
@@ -204,13 +302,16 @@ func (ah GoogleOauthHandler) RegisterHandlers(mux *http.ServeMux) {
 			SameSite: http.SameSiteNoneMode,
 		})
 
-		resp := callbackResponse{
-			Status: "success",
-			User:   &user,
-			Token:  token,
-		}
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
-		// Redirect to original request (if needed)
+		Url := fmt.Sprintf("%s%s", original_request.Host, original_request.Uri)
+		http.Redirect(w, r, Url, http.StatusFound)
+
+		// resp := callbackResponse{
+		// 	Status: "success",
+		// 	User:   &user,
+		// 	Token:  token,
+		// }
+
+		// w.WriteHeader(http.StatusOK)
+		// _ = json.NewEncoder(w).Encode(resp)
 	})
 }
