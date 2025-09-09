@@ -70,6 +70,8 @@ func verifyOAuthState(signedState string) (models.GoogleOauthState, error) {
 		return state, fmt.Errorf("failed to unmarshal state: %w", err)
 	}
 
+	fmt.Printf("Decoded OAuth state: %+v\n", state)
+
 	return state, nil
 }
 
@@ -303,9 +305,9 @@ func (ah GoogleOauthHandler) RegisterHandlers(mux *http.ServeMux) {
 			SameSite: http.SameSiteNoneMode,
 		})
 
-		Url := fmt.Sprintf("%s%s%s", original_request.Scheme, original_request.Host, original_request.Uri)
+		Url := fmt.Sprintf("%s://%s%s", original_request.Scheme, original_request.Host, original_request.Uri)
 
-		fmt.Printf("Redirecting user to original URL: %s\n", Url)
+		fmt.Printf("\nRedirecting user to original URL: %s\n", Url)
 
 		http.Redirect(w, r, Url, http.StatusFound)
 
