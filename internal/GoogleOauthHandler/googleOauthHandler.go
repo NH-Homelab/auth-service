@@ -148,14 +148,22 @@ func (ah GoogleOauthHandler) RegisterHandlers(mux *http.ServeMux) {
 				return
 			}
 
+			host := r.Header.Get("X-Original-Host")
+			path := r.Header.Get("X-Original-Path")
+			uri := r.Header.Get("X-Original-URI")
+			method := r.Header.Get("X-Original-Method")
+			scheme := r.Header.Get("X-Original-Scheme")
+
+			fmt.Printf("Original request info - Host: %s, Path: %s, URI: %s, Method: %s, Scheme: %s\n", host, path, uri, method, scheme)
+
 			// Create State object with CSRF token and request info
 			state := models.GoogleOauthState{
 				CsrfToken: csrfToken,
-				Host:      r.Header.Get("X-Original-Host"),
-				Path:      r.Header.Get("X-Original-Path"),
-				Uri:       r.Header.Get("X-Original-URI"),
-				Method:    r.Header.Get("X-Original-Method"),
-				Scheme:    r.Header.Get("X-Original-Scheme"),
+				Host:      host,
+				Path:      path,
+				Uri:       uri,
+				Method:    method,
+				Scheme:    scheme,
 			}
 
 			// Convert state to map for JWT signing
