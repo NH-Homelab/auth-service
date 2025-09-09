@@ -222,23 +222,13 @@ func (ah GoogleOauthHandler) RegisterHandlers(mux *http.ServeMux) {
 			return
 		}
 
-		scheme := r.Header.Get("X-Original-Scheme")
-		host := r.Header.Get("X-Original-Host")
-		// path := r.Header.Get("X-Original-Path")
-		uri := r.Header.Get("X-Original-URI")
-
-		Url := fmt.Sprintf("%s://%s%s", scheme, host, uri)
-		fmt.Printf("\nRedirecting user to original URL: %s\n", Url)
-		http.Redirect(w, r, Url, http.StatusFound)
-
 		// User is already authenticated
-		// resp := loginResponse{
-		// 	Status: "success",
-		// 	Token:  cookie.Value,
-		// }
-		// w.WriteHeader(http.StatusOK)
-		// _ = json.NewEncoder(w).Encode(resp)
-
+		resp := loginResponse{
+			Status: "success",
+			Token:  cookie.Value,
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(resp)
 	})
 
 	mux.HandleFunc("/google/callback", func(w http.ResponseWriter, r *http.Request) {
