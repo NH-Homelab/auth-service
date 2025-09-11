@@ -21,6 +21,10 @@ inputs:
     description: 'Kubernetes namespace'
     required: false
     default: 'default'
+  image-tag:
+    description: 'Docker image tag to deploy'
+    required: false
+    default: 'latest'
   
   # Application secrets
   secrets-json:
@@ -40,6 +44,22 @@ runs:
       with:
         secret-name: ${{ inputs.secret-name }}
         secrets-json: ${{ inputs.secrets-json }}
+    
+    - name: Update image tag in deployment
+      shell: bash
+      run: |
+        if [ "${{ inputs.image-tag }}" != "latest" ]; then
+          # Extract the SHA tag from the image tags (format: registry/repo:sha-abcdef)
+          SHA_TAG=$(echo "${{ inputs.image-tag }}" | grep -o "sha-[a-f0-9]*" | head -1)
+          if [ -n "$SHA_TAG" ]; then
+            echo "Updating deployment to use image tag: $SHA_TAG"
+            kubectl patch deployment ${{ inputs.deployment-name }} \
+              -p '{"spec":{"template":{"spec":{"containers":[{"name":"${{ inputs.deployment-name }}","image":"ghcr.io/nh-homelab/auth-service:'$SHA_TAG'"}]}}}}' \
+              --dry-run=client -o yaml | kubectl apply -f -
+          fi
+        fi
+      env:
+        KUBECONFIG: ${{ inputs.kubeconfig }}
     
     - name: Deploy to Kubernetes
       uses: ./.github/actions/k8s-deploy

@@ -9,6 +9,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   build-and-push-image:
     runs-on: self-hosted
@@ -17,11 +18,15 @@ jobs:
       packages: write
       attestations: write
       id-token: write
+    outputs:
+      image-tags: ${{ steps.build.outputs.image-tags }}
+      image-digest: ${{ steps.build.outputs.image-digest }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       
       - name: Build and Push Docker Image
+        id: build
         uses: ./.github/actions/docker-build-push
         with:
           image-name: ${{ env.IMAGE_NAME }}
@@ -38,6 +43,7 @@ jobs:
         uses: ./.github/actions/complete-deployment
         with:
           kubeconfig: ${{ secrets.KUBECONFIG }}
+          image-tag: ${{ needs.build-and-push-image.outputs.image-tags }}
           secrets-json: |
             {
               "DB_HOST": "${{ secrets.DB_HOST }}",
