@@ -5,16 +5,8 @@ metadata:
 spec:
   template:
     spec:
-      volumes:
-        - name: env-file
-          secret:
-            secretName: auth-secret
-            items:
-              - key: .env
-                path: .env
       containers:
         - name: auth-service
-          volumeMounts:
-            - name: env-file
-              mountPath: /app/.env
-              subPath: .env
+          envFrom:
+            - secretRef:
+                name: auth-secret

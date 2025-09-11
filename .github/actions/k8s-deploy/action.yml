@@ -1,0 +1,59 @@
+name: 'Deploy to Kubernetes'
+description: 'Deploys to Kubernetes using Kustomize and restarts deployment'
+inputs:
+  kustomize-path:
+    description: 'Path to Kustomize overlay'
+    required: false
+    default: 'deploy/overlays/prod/'
+  deployment-name:
+    description: 'Name of deployment to restart'
+    required: false
+    default: 'auth-service'
+  kubeconfig:
+    description: 'Kubeconfig content for kubectl authentication'
+    required: true
+  namespace:
+    description: 'Kubernetes namespace'
+    required: false
+    default: 'default'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+    
+    - name: Apply Kustomize configuration
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.namespace }}" ] && [ "${{ inputs.namespace }}" != "default" ]; then
+          kubectl apply -k ${{ inputs.kustomize-path }} -n ${{ inputs.namespace }}
+        else
+          kubectl apply -k ${{ inputs.kustomize-path }}
+        fi
+      env:
+        KUBECONFIG: ${{ inputs.kubeconfig }}
+    
+    - name: Restart deployment
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.namespace }}" ] && [ "${{ inputs.namespace }}" != "default" ]; then
+          kubectl rollout restart deployment ${{ inputs.deployment-name }} -n ${{ inputs.namespace }}
+        else
+          kubectl rollout restart deployment ${{ inputs.deployment-name }}
+        fi
+      env:
+        KUBECONFIG: ${{ inputs.kubeconfig }}
+    
+    - name: Wait for rollout to complete
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.namespace }}" ] && [ "${{ inputs.namespace }}" != "default" ]; then
+          kubectl rollout status deployment ${{ inputs.deployment-name }} -n ${{ inputs.namespace }} --timeout=300s
+        else
+          kubectl rollout status deployment ${{ inputs.deployment-name }} --timeout=300s
+        fi
+      env:
+        KUBECONFIG: ${{ inputs.kubeconfig }}

@@ -1,0 +1,50 @@
+name: 'Complete Auth Service Deployment'
+description: 'Complete deployment pipeline: secrets, kustomize, and restart'
+inputs:
+  # Kubernetes config
+  kubeconfig:
+    description: 'Kubeconfig content'
+    required: true
+  kustomize-path:
+    description: 'Path to Kustomize overlay'
+    required: false
+    default: 'deploy/overlays/prod/'
+  deployment-name:
+    description: 'Name of deployment to restart'
+    required: false
+    default: 'auth-service'
+  secret-name:
+    description: 'Name of the Kubernetes secret'
+    required: false
+    default: 'auth-secret'
+  namespace:
+    description: 'Kubernetes namespace'
+    required: false
+    default: 'default'
+  
+  # Application secrets
+  secrets-json:
+    description: 'JSON object containing all application secrets'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+    
+    - name: Create Kubernetes Secret
+      uses: ./.github/actions/create-k8s-secret
+      with:
+        secret-name: ${{ inputs.secret-name }}
+        secrets-json: ${{ inputs.secrets-json }}
+    
+    - name: Deploy to Kubernetes
+      uses: ./.github/actions/k8s-deploy
+      with:
+        kustomize-path: ${{ inputs.kustomize-path }}
+        deployment-name: ${{ inputs.deployment-name }}
+        kubeconfig: ${{ inputs.kubeconfig }}
+        namespace: ${{ inputs.namespace }}
