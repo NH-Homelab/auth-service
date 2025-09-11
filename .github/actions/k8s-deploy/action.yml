@@ -50,10 +50,23 @@ runs:
     - name: Wait for rollout to complete
       shell: bash
       run: |
+        echo "=== Starting rollout status check ==="
+        
         if [ -n "${{ inputs.namespace }}" ] && [ "${{ inputs.namespace }}" != "default" ]; then
           kubectl rollout status deployment ${{ inputs.deployment-name }} -n ${{ inputs.namespace }} --timeout=300s
         else
           kubectl rollout status deployment ${{ inputs.deployment-name }} --timeout=300s
+        fi
+        
+        echo "=== Post-deployment pod status ==="
+        if [ -n "${{ inputs.namespace }}" ] && [ "${{ inputs.namespace }}" != "default" ]; then
+          kubectl get pods -l app=${{ inputs.deployment-name }} -n ${{ inputs.namespace }}
+          echo "=== Pod logs (last 10 lines) ==="
+          kubectl logs -l app=${{ inputs.deployment-name }} -n ${{ inputs.namespace }} --tail=10 || echo "No logs available yet"
+        else
+          kubectl get pods -l app=${{ inputs.deployment-name }}
+          echo "=== Pod logs (last 10 lines) ==="
+          kubectl logs -l app=${{ inputs.deployment-name }} --tail=10 || echo "No logs available yet"
         fi
       env:
         KUBECONFIG: ${{ inputs.kubeconfig }}

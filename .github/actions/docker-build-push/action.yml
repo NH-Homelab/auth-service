@@ -72,6 +72,11 @@ runs:
       id: extract-sha
       shell: bash
       run: |
+        echo "=== DEBUG: All tags ==="
+        echo "${{ steps.meta.outputs.tags }}"
+        echo "======================="
         SHA_TAG=$(echo "${{ steps.meta.outputs.tags }}" | grep -E "sha-[a-f0-9]{7}" | head -1 | sed 's/.*://')
         echo "sha-tag=$SHA_TAG" >> $GITHUB_OUTPUT
         echo "Extracted SHA tag: $SHA_TAG"
+        echo "Current commit: ${{ github.sha }}"
+        echo "Current branch: ${{ github.ref_name }}"
