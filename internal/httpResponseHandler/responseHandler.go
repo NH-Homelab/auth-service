@@ -2,7 +2,7 @@ package httpresponsehandler
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 )
 
@@ -41,10 +41,10 @@ func WriteResponse(w http.ResponseWriter, r *http.Request, config ResponseConfig
 	url := r.Header.Get("X-Original-URL")
 
 	if config.Err != nil {
-		fmt.Printf("Request %s %s%s -- Error: %v\n", method, host, url, config.Err)
+		log.Printf("Request %s %s%s -- Error: %v\n", method, host, url, config.Err)
 	}
 
-	fmt.Printf("Request %s %s%s -- Writing response: %d %s - %s\n", method, host, url, config.StatusCode, config.StatusMessage, config.Message)
+	log.Printf("Request %s %s%s -- Writing response: %d %s - %s\n", method, host, url, config.StatusCode, config.StatusMessage, config.Message)
 
 	w.WriteHeader(config.StatusCode)
 	response := map[string]interface{}{

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -71,8 +72,6 @@ func verifyOAuthState(signedState string) (models.GoogleOauthState, error) {
 		return state, fmt.Errorf("failed to unmarshal state: %w", err)
 	}
 
-	fmt.Printf("Decoded OAuth state: %+v\n", state)
-
 	return state, nil
 }
 
@@ -105,8 +104,6 @@ func (ah GoogleOauthHandler) handleCallback(code string) (models.User, error) {
 		return models.User{}, fmt.Errorf("failed to decode user info: %w", err)
 	}
 
-	fmt.Printf("User Info: %+v\n", user_conf)
-
 	user, err := userdao.GetUser(ah.db, userdao.UserSearch{
 		Type:  userdao.Google,
 		Value: user_conf.GoogleId,
@@ -114,16 +111,16 @@ func (ah GoogleOauthHandler) handleCallback(code string) (models.User, error) {
 
 	switch err {
 	case nil:
-		fmt.Printf("User found: %v", user)
+		log.Printf("User found: %v", user)
 	case userdao.ErrUserNotFound:
-		fmt.Printf("Creating new user: %v", user_conf)
+		log.Printf("Creating new user: %v", user_conf)
 		user, err = userdao.CreateGoogleUser(ah.db, user_conf)
 		if err != nil {
-			fmt.Printf("Error creating user: %v", err)
+			log.Printf("Error creating user: %v", err)
 			return models.User{}, fmt.Errorf("failed to create user: %w", err)
 		}
 	default:
-		fmt.Printf("Error retrieving user: %v", err)
+		log.Printf("Error retrieving user: %v", err)
 		return models.User{}, fmt.Errorf("failed to retrieve user: %w", err)
 	}
 
@@ -135,7 +132,7 @@ func (ah GoogleOauthHandler) handleCallback(code string) (models.User, error) {
 
 func (ah GoogleOauthHandler) googleLogin(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("auth_token")
-	
+
 	if err != nil {
 		// Generate a secure CSRF token
 		csrfToken, err := generateCSRFToken()
@@ -318,7 +315,7 @@ func (ah GoogleOauthHandler) googleCallback(w http.ResponseWriter, r *http.Reque
 		SameSite: http.SameSiteNoneMode,
 	})
 
-	fmt.Printf("Redirecting to: %s://%s%s\n", original_request.Scheme, original_request.Host, original_request.Uri)
+	log.Printf("Redirecting to: %s://%s%s\n", original_request.Scheme, original_request.Host, original_request.Uri)
 
 	Url := fmt.Sprintf("%s://%s%s", original_request.Scheme, original_request.Host, original_request.Uri)
 	http.Redirect(w, r, Url, http.StatusFound)
