@@ -45,44 +45,6 @@ runs:
         secret-name: ${{ inputs.secret-name }}
         secrets-json: ${{ inputs.secrets-json }}
     
-    - name: Update image tag in deployment
-      shell: bash
-      run: |
-        if [ -n "${{ inputs.image-tag }}" ] && [ "${{ inputs.image-tag }}" != "latest" ]; then
-          echo "=== BEFORE PATCH ==="
-          kubectl get deployment ${{ inputs.deployment-name }} -o jsonpath='{.spec.template.spec.containers[0].image}'
-          echo ""
-          echo "===================="
-          
-          echo "Updating deployment image to: ghcr.io/nh-homelab/auth-service:${{ inputs.image-tag }}"
-          
-          kubectl patch deployment ${{ inputs.deployment-name }} \
-            -p '{"spec":{"template":{"spec":{"containers":[{"name":"${{ inputs.deployment-name }}","image":"ghcr.io/nh-homelab/auth-service:${{ inputs.image-tag }}"}]}}}}' \
-            --dry-run=client -o yaml | kubectl apply -f -
-          
-          echo "=== AFTER PATCH ==="
-          kubectl get deployment ${{ inputs.deployment-name }} -o jsonpath='{.spec.template.spec.containers[0].image}'
-          echo ""
-          echo "==================="
-          
-          # Verify the change took effect
-          CURRENT_IMAGE=$(kubectl get deployment ${{ inputs.deployment-name }} -o jsonpath='{.spec.template.spec.containers[0].image}')
-          EXPECTED_IMAGE="ghcr.io/nh-homelab/auth-service:${{ inputs.image-tag }}"
-          
-          if [ "$CURRENT_IMAGE" = "$EXPECTED_IMAGE" ]; then
-            echo "✅ Image update successful: $CURRENT_IMAGE"
-          else
-            echo "❌ Image update failed!"
-            echo "Expected: $EXPECTED_IMAGE"
-            echo "Actual: $CURRENT_IMAGE"
-            exit 1
-          fi
-        else
-          echo "No specific image tag provided, proceeding with rollout restart only"
-        fi
-      env:
-        KUBECONFIG: ${{ inputs.kubeconfig }}
-    
     - name: Deploy to Kubernetes
       uses: ./.github/actions/k8s-deploy
       with:
@@ -90,3 +52,4 @@ runs:
         deployment-name: ${{ inputs.deployment-name }}
         kubeconfig: ${{ inputs.kubeconfig }}
         namespace: ${{ inputs.namespace }}
+        image-tag: ${{ inputs.image-tag }}

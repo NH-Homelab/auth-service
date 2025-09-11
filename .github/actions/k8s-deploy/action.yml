@@ -16,6 +16,10 @@ inputs:
     description: 'Kubernetes namespace'
     required: false
     default: 'default'
+  image-tag:
+    description: 'Docker image tag to deploy'
+    required: false
+    default: 'latest'
 
 runs:
   using: 'composite'
@@ -36,6 +40,19 @@ runs:
       env:
         KUBECONFIG: ${{ inputs.kubeconfig }}
     
+    - name: Update image tag in deployment
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.image-tag }}" ] && [ "${{ inputs.image-tag }}" != "latest" ]; then
+          echo "Updating deployment image to: ghcr.io/nh-homelab/auth-service:${{ inputs.image-tag }}"
+          
+          kubectl patch deployment ${{ inputs.deployment-name }} \
+            -p '{"spec":{"template":{"spec":{"containers":[{"name":"${{ inputs.deployment-name }}","image":"ghcr.io/nh-homelab/auth-service:${{ inputs.image-tag }}"}]}}}}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+        fi
+      env:
+        KUBECONFIG: ${{ inputs.kubeconfig }}
+    
     - name: Restart deployment
       shell: bash
       run: |
@@ -50,23 +67,12 @@ runs:
     - name: Wait for rollout to complete
       shell: bash
       run: |
-        echo "=== Starting rollout status check ==="
-        
         if [ -n "${{ inputs.namespace }}" ] && [ "${{ inputs.namespace }}" != "default" ]; then
           kubectl rollout status deployment ${{ inputs.deployment-name }} -n ${{ inputs.namespace }} --timeout=300s
         else
           kubectl rollout status deployment ${{ inputs.deployment-name }} --timeout=300s
         fi
-        
-        echo "=== Post-deployment pod status ==="
-        if [ -n "${{ inputs.namespace }}" ] && [ "${{ inputs.namespace }}" != "default" ]; then
-          kubectl get pods -l app=${{ inputs.deployment-name }} -n ${{ inputs.namespace }}
-          echo "=== Pod logs (last 10 lines) ==="
-          kubectl logs -l app=${{ inputs.deployment-name }} -n ${{ inputs.namespace }} --tail=10 || echo "No logs available yet"
-        else
-          kubectl get pods -l app=${{ inputs.deployment-name }}
-          echo "=== Pod logs (last 10 lines) ==="
-          kubectl logs -l app=${{ inputs.deployment-name }} --tail=10 || echo "No logs available yet"
-        fi
+      env:
+        KUBECONFIG: ${{ inputs.kubeconfig }}
       env:
         KUBECONFIG: ${{ inputs.kubeconfig }}
