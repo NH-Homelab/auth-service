@@ -8,18 +8,13 @@ import (
 
 	"github.com/NH-Homelab/auth-service/internal/applicationdao"
 	"github.com/NH-Homelab/auth-service/internal/database"
+	httpresponsehandler "github.com/NH-Homelab/auth-service/internal/httpResponseHandler"
 	"github.com/NH-Homelab/auth-service/internal/jwt"
 	"github.com/NH-Homelab/auth-service/internal/models"
 )
 
 type AuthHandler struct {
 	db database.DatabaseConnection
-}
-
-type authResponse struct {
-	Status  string `json:"status"`
-	Message string `json:"message,omitempty"`
-	Error   string `json:"error,omitempty"`
 }
 
 func NewAuthHandler(db database.DatabaseConnection) *AuthHandler {
@@ -52,29 +47,23 @@ func (ah *AuthHandler) RegisterHandlers(mux *http.ServeMux) {
 		// Check if they have a cookie
 		cookie, err := r.Cookie("auth_token")
 		if err != nil {
-			fmt.Printf("No cookie found: %v\n", err)
-			resp := authResponse{
-				Status:  "error",
-				Message: "Cookie not found",
-			}
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(resp)
+			httpresponsehandler.WriteResponse(w, r, httpresponsehandler.ResponseConfig{
+				StatusCode:    http.StatusUnauthorized,
+				StatusMessage: httpresponsehandler.Error,
+				Message:       "No auth token provided",
+			})
 			return
 		}
 
 		user, err := ah.verifyToken(cookie.Value)
 		if err != nil {
-			fmt.Printf("Error verifying token: %v\n", err)
-			resp := authResponse{
-				Status:  "error",
-				Message: "Failed to verify token",
-			}
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(resp)
+			httpresponsehandler.WriteResponse(w, r, httpresponsehandler.ResponseConfig{
+				StatusCode:    http.StatusUnauthorized,
+				StatusMessage: httpresponsehandler.Error,
+				Message:       "Invalid auth token",
+			})
 			return
 		}
-
-		fmt.Printf("User: %+v\n", user)
 
 		jwtDomain := os.Getenv("JWT_DOMAIN")
 		subdomain := r.Host
@@ -86,42 +75,33 @@ func (ah *AuthHandler) RegisterHandlers(mux *http.ServeMux) {
 			}
 		}
 
-		fmt.Printf("Subdomain: %s\n", subdomain)
-
 		// Fetch application permissions from db
 		app, err := applicationdao.GetApplicationBySubdomain(ah.db, subdomain)
 		if err != nil {
-			fmt.Printf("Error fetching application: %v\n", err)
-			resp := authResponse{
-				Status:  "error",
-				Message: "Failed to fetch application information",
-			}
-			w.WriteHeader(http.StatusInternalServerError)
-			_ = json.NewEncoder(w).Encode(resp)
+			httpresponsehandler.WriteResponse(w, r, httpresponsehandler.ResponseConfig{
+				StatusCode:    http.StatusInternalServerError,
+				StatusMessage: httpresponsehandler.Error,
+				Message:       "Failed to fetch application from database",
+			})
 			return
 		}
 
-		fmt.Printf("Application: %+v\n", app)
-
 		// Check if user has permission to access the application
 		if !ah.hasPermission(user, app) {
-			fmt.Printf("User does not have permission to access this application: %v\n", user)
-			resp := authResponse{
-				Status:  "error",
-				Message: "User does not have permission to access this application",
-			}
-			w.WriteHeader(http.StatusForbidden)
-			_ = json.NewEncoder(w).Encode(resp)
+			httpresponsehandler.WriteResponse(w, r, httpresponsehandler.ResponseConfig{
+				StatusCode:    http.StatusForbidden,
+				StatusMessage: httpresponsehandler.Error,
+				Message:       fmt.Sprintf("User %s does not have permission to access application %s", user.Name, app.Name),
+			})
 			return
 		}
 
 		// Token is valid, proceed with the request
-		resp := authResponse{
-			Status:  "success",
-			Message: "Authenticated request successful!",
-		}
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
+		httpresponsehandler.WriteResponse(w, r, httpresponsehandler.ResponseConfig{
+			StatusCode:    http.StatusOK,
+			StatusMessage: httpresponsehandler.Success,
+			Message:       "User is authorized",
+		})
 	})
 }
 

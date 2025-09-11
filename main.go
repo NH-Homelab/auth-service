@@ -15,7 +15,7 @@ import (
 
 func logRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Received request: %s %s from %s\n", r.Method, r.URL, r.RemoteAddr)
+		log.Printf("Received request: %s %s/%s from %s\n", r.Method, r.Host, r.URL, r.RemoteAddr)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -54,32 +54,15 @@ func main() {
 	}
 	defer pgDB.Close()
 
-	// TODO: create separate mux for this if I want to apply middlewares
 	gah := GoogleOauthHandler.NewGoogleOauthHandler(pgDB)
 	gah.RegisterHandlers(mux)
 
 	ah := authhandler.NewAuthHandler(pgDB)
 	ah.RegisterHandlers(mux)
 
-	useTLS := os.Getenv("USE_TLS") == "true"
-	if useTLS {
-		certFile := os.Getenv("TLS_CERT_FILE")
-		keyFile := os.Getenv("TLS_KEY_FILE")
-		if certFile == "" || keyFile == "" {
-			log.Fatal("TLS enabled but TLS_CERT_FILE or TLS_KEY_FILE not set")
-		}
-		log.Printf("Starting HTTPS server on :8443...")
-		err := http.ListenAndServeTLS(":8443", certFile, keyFile, logRequest(setContentType(mux)))
-		if err != nil {
-			log.Fatalf("HTTPS server failed: %v", err)
-		}
-	} else {
-		// For production behind nginx, use plain HTTP:
-		// http.ListenAndServe(":8080", logRequest(mux))
-		log.Printf("Starting HTTP server on :8080...")
-		err := http.ListenAndServe(":8080", logRequest(setContentType(mux)))
-		if err != nil {
-			log.Fatalf("HTTP server failed: %v", err)
-		}
+	log.Printf("Starting HTTP server on :8080...")
+	err = http.ListenAndServe(":8080", logRequest(setContentType(mux)))
+	if err != nil {
+		log.Fatalf("HTTP server failed: %v", err)
 	}
 }
