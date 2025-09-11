@@ -27,6 +27,9 @@ outputs:
   image-tags:
     description: 'The tags of the built image'
     value: ${{ steps.meta.outputs.tags }}
+  sha-tag:
+    description: 'The SHA tag specifically'
+    value: ${{ steps.extract-sha.outputs.sha-tag }}
 
 runs:
   using: 'composite'
@@ -64,3 +67,11 @@ runs:
         subject-name: ${{ inputs.registry }}/${{ inputs.image-name }}
         subject-digest: ${{ steps.push.outputs.digest }}
         push-to-registry: true
+    
+    - name: Extract SHA tag
+      id: extract-sha
+      shell: bash
+      run: |
+        SHA_TAG=$(echo "${{ steps.meta.outputs.tags }}" | grep -E "sha-[a-f0-9]{7}" | head -1 | sed 's/.*://')
+        echo "sha-tag=$SHA_TAG" >> $GITHUB_OUTPUT
+        echo "Extracted SHA tag: $SHA_TAG"

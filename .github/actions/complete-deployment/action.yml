@@ -48,15 +48,14 @@ runs:
     - name: Update image tag in deployment
       shell: bash
       run: |
-        if [ "${{ inputs.image-tag }}" != "latest" ]; then
-          # Extract the SHA tag from the image tags (format: registry/repo:sha-abcdef)
-          SHA_TAG=$(echo "${{ inputs.image-tag }}" | grep -o "sha-[a-f0-9]*" | head -1)
-          if [ -n "$SHA_TAG" ]; then
-            echo "Updating deployment to use image tag: $SHA_TAG"
-            kubectl patch deployment ${{ inputs.deployment-name }} \
-              -p '{"spec":{"template":{"spec":{"containers":[{"name":"${{ inputs.deployment-name }}","image":"ghcr.io/nh-homelab/auth-service:'$SHA_TAG'"}]}}}}' \
-              --dry-run=client -o yaml | kubectl apply -f -
-          fi
+        if [ -n "${{ inputs.image-tag }}" ] && [ "${{ inputs.image-tag }}" != "latest" ]; then
+          echo "Updating deployment image to: ghcr.io/nh-homelab/auth-service:${{ inputs.image-tag }}"
+          
+          kubectl patch deployment ${{ inputs.deployment-name }} \
+            -p '{"spec":{"template":{"spec":{"containers":[{"name":"${{ inputs.deployment-name }}","image":"ghcr.io/nh-homelab/auth-service:${{ inputs.image-tag }}"}]}}}}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+        else
+          echo "No specific image tag provided, proceeding with rollout restart only"
         fi
       env:
         KUBECONFIG: ${{ inputs.kubeconfig }}
