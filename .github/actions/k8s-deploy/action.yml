@@ -1,0 +1,76 @@
+name: 'Deploy to Kubernetes'
+description: 'Deploys to Kubernetes using Kustomize and restarts deployment'
+inputs:
+  kustomize-path:
+    description: 'Path to Kustomize overlay'
+    required: false
+    default: 'deploy/overlays/prod/'
+  deployment-name:
+    description: 'Name of deployment to restart'
+    required: false
+    default: 'auth-service'
+  kubeconfig:
+    description: 'Kubeconfig content for kubectl authentication'
+    required: true
+  namespace:
+    description: 'Kubernetes namespace'
+    required: false
+    default: 'default'
+  image-tag:
+    description: 'Docker image tag to deploy'
+    required: false
+    default: 'latest'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+    
+    - name: Apply Kustomize configuration
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.namespace }}" ] && [ "${{ inputs.namespace }}" != "default" ]; then
+          kubectl apply -k ${{ inputs.kustomize-path }} -n ${{ inputs.namespace }}
+        else
+          kubectl apply -k ${{ inputs.kustomize-path }}
+        fi
+      env:
+        KUBECONFIG: ${{ inputs.kubeconfig }}
+    
+    - name: Update image tag in deployment
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.image-tag }}" ] && [ "${{ inputs.image-tag }}" != "latest" ]; then
+          echo "Updating deployment image to: ghcr.io/nh-homelab/auth-service:${{ inputs.image-tag }}"
+          
+          kubectl patch deployment ${{ inputs.deployment-name }} \
+            -p '{"spec":{"template":{"spec":{"containers":[{"name":"${{ inputs.deployment-name }}","image":"ghcr.io/nh-homelab/auth-service:${{ inputs.image-tag }}"}]}}}}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+        fi
+      env:
+        KUBECONFIG: ${{ inputs.kubeconfig }}
+    
+    - name: Restart deployment
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.namespace }}" ] && [ "${{ inputs.namespace }}" != "default" ]; then
+          kubectl rollout restart deployment ${{ inputs.deployment-name }} -n ${{ inputs.namespace }}
+        else
+          kubectl rollout restart deployment ${{ inputs.deployment-name }}
+        fi
+      env:
+        KUBECONFIG: ${{ inputs.kubeconfig }}
+    
+    - name: Wait for rollout to complete
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.namespace }}" ] && [ "${{ inputs.namespace }}" != "default" ]; then
+          kubectl rollout status deployment ${{ inputs.deployment-name }} -n ${{ inputs.namespace }} --timeout=300s
+        else
+          kubectl rollout status deployment ${{ inputs.deployment-name }} --timeout=300s
+        fi
+      env:
+        KUBECONFIG: ${{ inputs.kubeconfig }}

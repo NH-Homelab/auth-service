@@ -1,11 +1,15 @@
-name: Build, Push, and Deploy
+name: Deploy Pipeline
 on:
   push:
     branches:
       - main
+      - workflow-update
+  workflow_dispatch:
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   build-and-push-image:
     runs-on: self-hosted
@@ -14,90 +18,46 @@ jobs:
       packages: write
       attestations: write
       id-token: write
+    outputs:
+      image-tags: ${{ steps.build.outputs.image-tags }}
+      image-digest: ${{ steps.build.outputs.image-digest }}
+      sha-tag: ${{ steps.build.outputs.sha-tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Log in to Docker Hub
-        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+      
+      - name: Build and Push Docker Image
+        id: build
+        uses: ./.github/actions/docker-build-push
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
-      - name: Build and push Docker image
-        id: push
-        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
-        with:
-          context: .
-          file: ./deploy/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
-  deploy:
-    runs-on: self-hosted
+          image-name: ${{ env.IMAGE_NAME }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+  
+  prod-deploy:
+    runs-on: k8s-runner
     needs: build-and-push-image
-    env:
-      DB_HOST: ${{ secrets.DB_HOST }}
-      DB_PORT: ${{ secrets.DB_PORT }}
-      DB_USER: ${{ secrets.DB_USER }}
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-      DB_NAME: ${{ secrets.DB_NAME }}
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-      GOOGLE_REDIRECT_URL: ${{ secrets.GOOGLE_REDIRECT_URL }}
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      JWT_DOMAIN: ${{ secrets.JWT_DOMAIN }}
-      USE_TLS: ${{ secrets.USE_TLS }}
-      TLS_CERT_FILE: ${{ secrets.TLS_CERT_FILE }}
-      TLS_KEY_FILE: ${{ secrets.TLS_KEY_FILE }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
+      
+      - name: Complete Deployment
+        uses: ./.github/actions/complete-deployment
         with:
-          version: 'latest'
-      - name: Create .env file from secrets
-        run: |
-          echo "DB_HOST=${DB_HOST}" >> .env
-          echo "DB_PORT=${DB_PORT}" >> .env
-          echo "DB_USER=${DB_USER}" >> .env
-          echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
-          echo "DB_NAME=${DB_NAME}" >> .env
-          echo "GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}" >> .env
-          echo "GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}" >> .env
-          echo "GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL}" >> .env
-          echo "JWT_SECRET=${JWT_SECRET}" >> .env
-          echo "JWT_DOMAIN=${JWT_DOMAIN}" >> .env
-          echo "USE_TLS=${USE_TLS}" >> .env
-          echo "TLS_CERT_FILE=${TLS_CERT_FILE}" >> .env
-          echo "TLS_KEY_FILE=${TLS_KEY_FILE}" >> .env
-      - name: Create Kubernetes Secret from .env
-        run: |
-          kubectl create secret generic auth-secret \
-            --from-file=.env=.env \
-            --dry-run=client -o yaml > deploy/overlays/prod/secret.yaml
-      - name: Run Kustomize
-        run: |
-          kubectl apply -k deploy/overlays/prod/
-        env:
-          KUBECONFIG: ${{ secrets.KUBECONFIG }}
-      - name: Restart auth-service deployment
-        run: |
-          kubectl rollout restart deployment auth-service
-        env:
-          KUBECONFIG: ${{ secrets.KUBECONFIG }}
+          kubeconfig: ${{ secrets.KUBECONFIG }}
+          image-tag: ${{ needs.build-and-push-image.outputs.sha-tag }}
+          secrets-json: |
+            {
+              "DB_HOST": "${{ secrets.DB_HOST }}",
+              "DB_PORT": "${{ secrets.DB_PORT }}",
+              "DB_USER": "${{ secrets.DB_USER }}",
+              "DB_PASSWORD": "${{ secrets.DB_PASSWORD }}",
+              "DB_NAME": "${{ secrets.DB_NAME }}",
+              "GOOGLE_CLIENT_ID": "${{ secrets.GOOGLE_CLIENT_ID }}",
+              "GOOGLE_CLIENT_SECRET": "${{ secrets.GOOGLE_CLIENT_SECRET }}",
+              "GOOGLE_REDIRECT_URL": "${{ secrets.GOOGLE_REDIRECT_URL }}",
+              "JWT_SECRET": "${{ secrets.JWT_SECRET }}",
+              "JWT_DOMAIN": "${{ secrets.JWT_DOMAIN }}",
+              "USE_TLS": "${{ secrets.USE_TLS }}",
+              "TLS_CERT_FILE": "${{ secrets.TLS_CERT_FILE }}",
+              "TLS_KEY_FILE": "${{ secrets.TLS_KEY_FILE }}"
+            }

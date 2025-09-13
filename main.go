@@ -6,8 +6,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/joho/godotenv"
-
 	"github.com/NH-Homelab/auth-service/internal/GoogleOauthHandler"
 	authhandler "github.com/NH-Homelab/auth-service/internal/authHandler"
 	"github.com/NH-Homelab/auth-service/internal/pg_db"
@@ -28,11 +26,10 @@ func setContentType(next http.Handler) http.Handler {
 }
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
+	// err := godotenv.Load()
+	// if err != nil {
+	// 	log.Fatal("Error loading .env file")
+	// }
 	mux := http.NewServeMux()
 
 	db_port, err := strconv.Atoi(os.Getenv("DB_PORT"))

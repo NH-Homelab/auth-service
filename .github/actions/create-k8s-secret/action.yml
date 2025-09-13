@@ -1,0 +1,21 @@
+name: 'Create Kubernetes Secret'
+description: 'Creates a Kubernetes secret from auth service secrets'
+inputs:
+  secret-name:
+    description: 'Name of the Kubernetes secret to create'
+    required: false
+    default: 'auth-secret'
+  secrets-json:
+    description: 'JSON object containing all secrets'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Create Kubernetes Secret
+      shell: bash
+      run: |
+        # Parse the JSON input and create the secret
+        echo '${{ inputs.secrets-json }}' | jq -r 'to_entries[] | "--from-literal=\(.key)=\(.value)"' | \
+        xargs kubectl create secret generic ${{ inputs.secret-name }} \
+          --dry-run=client -o yaml | kubectl apply -f -
