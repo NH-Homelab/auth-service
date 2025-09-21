@@ -5,19 +5,11 @@ metadata:
 spec:
   template:
     spec:
-      volumes:
-        - name: env-file
-          configMap:
-            name: auth-env
-            items:
-              - key: .env
-                path: .env
       containers:
         - name: auth-service
           image: auth-service:latest
           imagePullPolicy: Never
-          volumeMounts:
-            - name: env-file
-              mountPath: /app/.env
-              subPath: .env
+          envFrom:
+            - configMapRef:
+                name: auth-env
       imagePullSecrets: []   # <-- removes the secret
