@@ -34,7 +34,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
   
   dev-deploy:
-    runs-on: k8s-dev
+    runs-on: dev
     needs: build-and-push-image
     steps:
       - name: Checkout code
