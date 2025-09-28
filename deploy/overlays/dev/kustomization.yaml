@@ -8,5 +8,5 @@ generatorOptions:
   disableNameSuffixHash: true
 configMapGenerator:
   - name: auth-env
-    files:
+    envs:
       - .env

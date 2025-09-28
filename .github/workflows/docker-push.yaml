@@ -33,9 +33,40 @@ jobs:
           image-name: ${{ env.IMAGE_NAME }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
   
+  dev-deploy:
+    runs-on: dev
+    needs: build-and-push-image
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Complete Dev Deployment
+        uses: ./.github/actions/complete-deployment
+        with:
+          kubeconfig: ${{ secrets.KUBECONFIG }}
+          kustomize-path: 'deploy/overlays/prod/'
+          image-tag: ${{ needs.build-and-push-image.outputs.sha-tag }}
+          secrets-json: |
+            {
+              "DB_HOST": "${{ secrets.DB_HOST }}",
+              "DB_PORT": "${{ secrets.DB_PORT }}",
+              "DB_USER": "${{ secrets.DB_USER }}",
+              "DB_PASSWORD": "${{ secrets.DB_PASSWORD }}",
+              "DB_NAME": "${{ secrets.DB_NAME }}",
+              "GOOGLE_CLIENT_ID": "${{ secrets.GOOGLE_CLIENT_ID }}",
+              "GOOGLE_CLIENT_SECRET": "${{ secrets.GOOGLE_CLIENT_SECRET }}",
+              "GOOGLE_REDIRECT_URL": "${{ secrets.GOOGLE_REDIRECT_URL }}",
+              "JWT_SECRET": "${{ secrets.JWT_SECRET }}",
+              "JWT_DOMAIN": "${{ secrets.JWT_DOMAIN }}",
+              "USE_TLS": "${{ secrets.USE_TLS }}",
+              "TLS_CERT_FILE": "${{ secrets.TLS_CERT_FILE }}",
+              "TLS_KEY_FILE": "${{ secrets.TLS_KEY_FILE }}"
+            }
+  
   prod-deploy:
     runs-on: k8s-runner
-    needs: build-and-push-image
+    needs: [build-and-push-image, dev-deploy]
+    if: (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && success()
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
