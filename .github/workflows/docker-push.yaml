@@ -55,9 +55,9 @@ jobs:
               "DB_NAME": "${{ secrets.DB_NAME }}",
               "GOOGLE_CLIENT_ID": "${{ secrets.GOOGLE_CLIENT_ID }}",
               "GOOGLE_CLIENT_SECRET": "${{ secrets.GOOGLE_CLIENT_SECRET }}",
-              "GOOGLE_REDIRECT_URL": "${{ secrets.GOOGLE_REDIRECT_URL }}",
+              "GOOGLE_REDIRECT_URL": "${{ secrets.DEV_GOOGLE_REDIRECT_URL }}",
               "JWT_SECRET": "${{ secrets.JWT_SECRET }}",
-              "JWT_DOMAIN": "${{ secrets.JWT_DOMAIN }}",
+              "JWT_DOMAIN": "${{ secrets.DEV_JWT_DOMAIN }}",
               "USE_TLS": "${{ secrets.USE_TLS }}",
               "TLS_CERT_FILE": "${{ secrets.TLS_CERT_FILE }}",
               "TLS_KEY_FILE": "${{ secrets.TLS_KEY_FILE }}"
