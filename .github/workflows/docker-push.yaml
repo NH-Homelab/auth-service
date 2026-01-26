@@ -35,7 +35,7 @@ jobs:
   
   prod-deploy:
     runs-on: k8s-prod-k3s
-    needs: [build-and-push-image, dev-deploy]
+    needs: [build-and-push-image]
     if: (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && success()
     steps:
       - name: Checkout code
